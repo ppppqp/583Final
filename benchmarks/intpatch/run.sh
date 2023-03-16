@@ -69,4 +69,4 @@ else
 fi
 
 # Cleanup: Remove this if you want to retain the created files.
-rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *.ll a.out
+# rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *.ll a.out
