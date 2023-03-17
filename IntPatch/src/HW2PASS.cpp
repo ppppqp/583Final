@@ -33,6 +33,7 @@
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Analysis/MemoryLocation.h"
 #include <map>
 
 using namespace llvm;
@@ -59,8 +60,10 @@ namespace IntPatch{
 
         }
       }
+      errs() << "here\n";
       bool change = true;
       while(change){
+        errs() << change << "\n";
         change = false;
         for(Function &f : M){
           for(BasicBlock &bb : f){
@@ -84,31 +87,46 @@ namespace IntPatch{
               // the target memory will be assigned with type τ, and the memory’s type information 
               // will be joined into tp_v."
               // store op
-                Value* storeAddr = inst.getPointerOperand();
-                Value* value = inst.getValueOperand();
+                StoreInst* store = cast<StoreInst>(&inst);
+                Value* storePtr = store->getPointerOperand();
+                MemoryLocation storeAddr = MemoryLocation::get(store);
+              // aliasSetTracker.add(storeAddr)
+                
+                Value* value = store->getValueOperand();
                 if(v2Type.find(value) != v2Type.end()){
                   int valueType = v2Type[value];
-                  change |= (v2Type[storeAddr] == valueType);
-                  v2Type[storeAddr] = valueType;
+                  change |= (v2Type[storePtr] == valueType);
+                  v2Type[storePtr] = valueType;
 
-                  tp_v[storeAddr] |= valueType; // initial value of tp_v?
+                  tp_v[storePtr] |= valueType; // initial value of tp_v?
                   //FIXME: What about v2Type[&inst] ?
+
+
+                  if(v2Type[value] == 3){
+                    // vulnerability
+                  }
                 }
+
+
               } else if(opcode == Instruction::Load){
               // load op
-                Value* loadAddr = inst.getPointerOperand();
-                Value* value = inst.getValueOperand();
-                int type = tp_v[loadAddr];
+                LoadInst* load = cast<LoadInst>(&inst);
+                Value* loadPtr = load->getPointerOperand();
+                MemoryLocation loadAddr = MemoryLocation::get(load);
+                int type = tp_v[loadPtr];
                 //TODO: for all v in the alias,  type |= tp_v[loadAddr]
+                // aliasSetTracker.add(loadAddr)
+                // aliasSet = aliasSetTracker.getAliasSetFor(MemoryLocation)
+                // iterate over the aliasSet, somehow get the type of that element
+                // Compute the type using aliases
                 if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] == type;
                 v2Type[&inst] = type;
-
-              } else if(opcode == Instruction::Branch){
+              } else if(opcode == Instruction::Br || opcode == Instruction::IndirectBr){
                 v2Type[&inst] = 0;
               } else if(opcode == Instruction::ICmp || opcode == Instruction::FCmp){
                 int type = 0;
-                for(int i = 0; i < inst->getNumOperands(); i++){
-                  Value* operand = inst->getOperand(i);
+                for(int i = 0; i < inst.getNumOperands(); i++){
+                  Value* operand = inst.getOperand(i);
                   if(v2Type.find(operand) != v2Type.end()){
                     type |= v2Type[operand];
                   }
@@ -118,8 +136,8 @@ namespace IntPatch{
                 v2Type[&inst] = type;
               } else if(opcode == Instruction::PHI){
                 int type = 0;
-                for(int i = 0; i < inst->getNumOperands(); i++){
-                  Value* operand = inst->getOperand(i);
+                for(int i = 0; i < inst.getNumOperands(); i++){
+                  Value* operand = inst.getOperand(i);
                   if(v2Type.find(operand) != v2Type.end()){
                     type |= v2Type[operand];
                   }
