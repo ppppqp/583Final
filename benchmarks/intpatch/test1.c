@@ -6,8 +6,13 @@ void fn(int param1){
 int main(){
     int a = 2147483647; 
     int b = 2147483647;
-    char input[20];
-    scanf("%s", input);
+    int input;
+    FILE* pFile;
+    pFile = fopen("input1", "r");
+    fscanf(pFile, "%d", &input);
+    printf("%d", input);
+    int plus1=input+1;
+    fclose(pFile);
     // int* ptr = malloc(b+1+a);
     fn(b+3+a);
     printf("%d", b+3+a); // 1

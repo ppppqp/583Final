@@ -60,14 +60,13 @@ namespace IntPatch{
 
         }
       }
-      errs() << "here\n";
       bool change = true;
       while(change){
-        errs() << change << "\n";
+        errs() << "iteration!\n";
         change = false;
+
         for(Function &f : M){
           for(BasicBlock &bb : f){
-            bb.printAsOperand(errs(), false);
             for(Instruction &inst : bb){
               unsigned opcode = inst.getOpcode();
               // assignment statement?
@@ -80,7 +79,8 @@ namespace IntPatch{
                     type |= v2Type[operand];
                   }
                 }
-                change |= (v2Type[&inst] == type);
+                change |= (v2Type[&inst] != type);
+                // errs() << "at 82:" << change << "\n"; 
                 v2Type[&inst] = type;
               } else if(opcode == Instruction::Store){
               // " If variable v1 with type τ is stored into a memory pointed by v,
@@ -95,18 +95,17 @@ namespace IntPatch{
                 Value* value = store->getValueOperand();
                 if(v2Type.find(value) != v2Type.end()){
                   int valueType = v2Type[value];
-                  change |= (v2Type[storePtr] == valueType);
+                  change |= (v2Type[storePtr] != valueType);
+                  // errs() << "at 97:" << change << "\n"; 
                   v2Type[storePtr] = valueType;
 
                   tp_v[storePtr] |= valueType; // initial value of tp_v?
                   //FIXME: What about v2Type[&inst] ?
 
-
                   if(v2Type[value] == 3){
                     // vulnerability
                   }
                 }
-
 
               } else if(opcode == Instruction::Load){
               // load op
@@ -119,7 +118,12 @@ namespace IntPatch{
                 // aliasSet = aliasSetTracker.getAliasSetFor(MemoryLocation)
                 // iterate over the aliasSet, somehow get the type of that element
                 // Compute the type using aliases
-                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] == type;
+
+                if(v2Type.find(&inst) != v2Type.end()){
+                  // errs() << v2Type[&inst] << type << "\n";
+                  change |= v2Type[&inst] != type;
+                }
+                // errs() << "at 120:" << change << "\n"; 
                 v2Type[&inst] = type;
               } else if(opcode == Instruction::Br || opcode == Instruction::IndirectBr){
                 v2Type[&inst] = 0;
@@ -132,7 +136,8 @@ namespace IntPatch{
                   }
                 }
                 type &= 2;
-                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] == type;
+                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] != type;
+                // errs() << "at 135:" << change << "\n"; 
                 v2Type[&inst] = type;
               } else if(opcode == Instruction::PHI){
                 int type = 0;
@@ -142,19 +147,52 @@ namespace IntPatch{
                     type |= v2Type[operand];
                   }
                 }
-                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] == type;
+                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] != type;
+                // errs() << "at 146:" << change << "\n"; 
                 v2Type[&inst] = type;
-              } else{
+              } else if(opcode == Instruction::Call){
+                CallInst* call = cast<CallInst>(&inst);
+                Function *fun = call->getCalledFunction();
+                if(fun){
+                  if(fun->getName() == "__isoc99_fscanf"){
+                    Value* v = call->getArgOperand(2);
+                    errs() << "Dangerous Operand:";
+                    v->print(errs(), false);
+                    errs() << "\n";
+                    v2Type[v] = 3;
+                  }
+                } else{
+                  // indirect call
+                }
+                
+              }
+              else{
                 // default: as assignment
                 int type = 0;
-                if(v2Type.find(inst.getOperand(0)) != v2Type.end()){
+                if(inst.getNumOperands() > 0 && v2Type.find(inst.getOperand(0)) != v2Type.end()){
                   type = v2Type[inst.getOperand(0)];
                 }
-                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] == type;
-                v2Type[&inst] = type;
+                if(v2Type.find(&inst) != v2Type.end()) change |= v2Type[&inst] < type;
+                // errs() << "at 174:" << change << "\n"; 
+                // errs() << v2Type[&inst] << type << "\n";
+                v2Type[&inst] |= type;
               }
             } 
           }
+        }
+      }
+
+      for(auto i : v2Type){
+        Instruction* inst = dyn_cast<Instruction>(i.first);
+        if(inst){
+          int type = i.second;
+          errs() << "Function:" << inst->getParent()->getParent()->getName();
+          errs() << " BB:";
+          inst->getParent()->printAsOperand(errs(), false);
+
+          errs() << " inst:";
+          inst->print(errs(), false);
+          errs() << " type:" << type << "\n";
         }
       }
       return false;

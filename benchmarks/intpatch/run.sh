@@ -52,6 +52,7 @@ llvm-dis ${1}.ls.bc -o ${1}_before.ll
 llvm-dis ${1}.ls.bc -o ${1}_after.ll
 
 # Produce output from binary to check correctness
+
 ./${1}_fplicm > fplicm_output
 
 echo -e "\n=== Correctness Check ==="
