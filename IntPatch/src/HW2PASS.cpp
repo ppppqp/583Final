@@ -70,9 +70,9 @@ namespace IntPatch{
             for(Instruction &inst : bb){
               unsigned opcode = inst.getOpcode();
               // assignment statement?
-              if(opcode == Instruction::Add || opcode == Instruction::Sub || opcode == Instruction::Mul){
-                // arithmetic op, TODO: should also contain leftshift
-                int type = 1;
+              if(opcode == Instruction::Add || opcode == Instruction::Sub || opcode == Instruction::Mul || opcode == Instruction::Shl){
+                // arithmetic op, add, subtract, multiply, left shift
+                int type = 1;  // T_01
                 for(int i = 0; i < inst.getNumOperands(); i++){
                   Value* operand = inst.getOperand(i);
                   if(v2Type.find(operand) != v2Type.end()){
@@ -100,13 +100,12 @@ namespace IntPatch{
                   v2Type[storePtr] = valueType;
 
                   tp_v[storePtr] |= valueType; // initial value of tp_v?
-                  //FIXME: What about v2Type[&inst] ?
-
+                  v2Type[&inst] = 0;
                   if(v2Type[value] == 3){
                     // vulnerability
+                    errs() << inst << " Uses a 11 type operand at sink!\n";
                   }
                 }
-
               } else if(opcode == Instruction::Load){
               // load op
                 LoadInst* load = cast<LoadInst>(&inst);
@@ -123,7 +122,7 @@ namespace IntPatch{
                   // errs() << v2Type[&inst] << type << "\n";
                   change |= v2Type[&inst] != type;
                 }
-                // errs() << "at 120:" << change << "\n"; 
+                // errs() << "at 120:" << change << "\n";
                 v2Type[&inst] = type;
               } else if(opcode == Instruction::Br || opcode == Instruction::IndirectBr){
                 v2Type[&inst] = 0;
