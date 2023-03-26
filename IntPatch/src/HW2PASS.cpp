@@ -33,6 +33,9 @@
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Analysis/AliasSetTracker.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include <map>
 
@@ -50,9 +53,15 @@ namespace IntPatch{
   struct DetectPass: public ModulePass {
     static char ID;
     DetectPass(): ModulePass(ID) {}
+    void getAnalysisUsage(AnalysisUsage &AU) const override {
+      AU.addRequired<AAResultsWrapperPass>();
+    }
     virtual bool runOnModule(Module &M) override{
+
+      // std::map<Function*, AAResults*> f2Alias;
       std::map<Value*, int> v2Type;
       std::map<Value*, int> tp_v; // for pointer variable
+
       for(Function &f : M){
         for(BasicBlock &bb: f){
           // initialize variables at key points
@@ -60,12 +69,22 @@ namespace IntPatch{
 
         }
       }
-      bool change = true;
-      while(change){
-        errs() << "iteration!\n";
-        change = false;
 
+      
+      bool change = true;
+      int iterCount = 1;
+      while(change){
+        errs() << "===============iteration: " << iterCount << "====================\n";
+        iterCount++;
+        change = false;
         for(Function &f : M){
+          if(f.isDeclaration()){
+            errs() << f.getName() <<  " only has declaration. Skip!\n";
+            continue;
+          }
+
+          AAResults* aaResults = &getAnalysis<AAResultsWrapperPass>(f).getAAResults();
+          AliasSetTracker aliasSetTracker(*aaResults);
           for(BasicBlock &bb : f){
             for(Instruction &inst : bb){
               unsigned opcode = inst.getOpcode();
@@ -113,15 +132,25 @@ namespace IntPatch{
                 MemoryLocation loadAddr = MemoryLocation::get(load);
                 int type = tp_v[loadPtr];
                 //TODO: for all v in the alias,  type |= tp_v[loadAddr]
-                // aliasSetTracker.add(loadAddr)
-                // aliasSet = aliasSetTracker.getAliasSetFor(MemoryLocation)
-                // iterate over the aliasSet, somehow get the type of that element
-                // Compute the type using aliases
-
+                aliasSetTracker.add(load);
+                AliasSet &aliasSet = aliasSetTracker.getAliasSetFor(loadAddr);
+                errs() << "LOAD OP:" << *load << "\n";
+                errs() << "ALIAS:\n";
+                for(AliasSet::iterator I = aliasSet.begin(), E = aliasSet.end(); I != E; ++I){
+                  Value *V = I.getPointer();
+                  errs() << " * ";
+                  V->print(errs(), false);
+                  errs() << ":";
+                  errs() << "\n";
+                  if(tp_v.find(V)!=tp_v.end()){
+                    type |= tp_v[V];
+                  }
+                }
                 if(v2Type.find(&inst) != v2Type.end()){
                   // errs() << v2Type[&inst] << type << "\n";
                   change |= v2Type[&inst] != type;
                 }
+                errs() << inst << ":" << v2Type[&inst] << "\n";
                 // errs() << "at 120:" << change << "\n";
                 v2Type[&inst] = type;
               } else if(opcode == Instruction::Br || opcode == Instruction::IndirectBr){
