@@ -98,6 +98,7 @@ namespace IntPatch{
                     type |= v2Type[operand];
                   }
                 }
+
                 change |= (v2Type[&inst] != type);
                 // errs() << "at 82:" << change << "\n"; 
                 v2Type[&inst] = type;
@@ -109,17 +110,17 @@ namespace IntPatch{
                 StoreInst* store = cast<StoreInst>(&inst);
                 Value* storePtr = store->getPointerOperand();
                 MemoryLocation storeAddr = MemoryLocation::get(store);
-              // aliasSetTracker.add(storeAddr)
-                
+                aliasSetTracker.add(store);
                 Value* value = store->getValueOperand();
                 if(v2Type.find(value) != v2Type.end()){
                   int valueType = v2Type[value];
-                  change |= (v2Type[storePtr] != valueType);
+
+                  // change |= (v2Type[storePtr] != valueType);
                   // errs() << "at 97:" << change << "\n"; 
-                  v2Type[storePtr] = valueType;
+                  // v2Type[storePtr] = valueTyvpe;
 
                   tp_v[storePtr] |= valueType; // initial value of tp_v?
-                  v2Type[&inst] = 0;
+                  v2Type[&inst] = valueType;
                   if(v2Type[value] == 3){
                     // vulnerability
                     errs() << inst << " Uses a 11 type operand at sink!\n";
@@ -134,14 +135,14 @@ namespace IntPatch{
                 //TODO: for all v in the alias,  type |= tp_v[loadAddr]
                 aliasSetTracker.add(load);
                 AliasSet &aliasSet = aliasSetTracker.getAliasSetFor(loadAddr);
-                errs() << "LOAD OP:" << *load << "\n";
-                errs() << "ALIAS:\n";
+                // errs() << "LOAD OP:" << *load << "\n";
+                // errs() << "ALIAS:\n";
                 for(AliasSet::iterator I = aliasSet.begin(), E = aliasSet.end(); I != E; ++I){
                   Value *V = I.getPointer();
-                  errs() << " * ";
+                  // errs() << " * ";
                   V->print(errs(), false);
-                  errs() << ":";
-                  errs() << "\n";
+                  // errs() << ":";
+                  // errs() << "\n";
                   if(tp_v.find(V)!=tp_v.end()){
                     type |= tp_v[V];
                   }
@@ -150,6 +151,11 @@ namespace IntPatch{
                   // errs() << v2Type[&inst] << type << "\n";
                   change |= v2Type[&inst] != type;
                 }
+
+                // if(change){
+                //     errs() << "\nloadPtr!!:"; 
+                //     errs() << inst << " " << v2Type[&inst] << "=> " << type << "\n";
+                // }
                 errs() << inst << ":" << v2Type[&inst] << "\n";
                 // errs() << "at 120:" << change << "\n";
                 v2Type[&inst] = type;
