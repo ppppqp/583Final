@@ -123,7 +123,7 @@ namespace IntPatch{
                   v2Type[&inst] = valueType;
                   if(v2Type[value] == 3){
                     // vulnerability
-                    errs() << inst << " Uses a 11 type operand at sink!\n";
+                    errs() << inst << "\n\n#######!!!!!!!!Uses a 11 type operand at sink!!!!!!!!########\n\n";
                   }
                 }
               } else if(opcode == Instruction::Load){
@@ -194,6 +194,7 @@ namespace IntPatch{
                     v->print(errs(), false);
                     errs() << "\n";
                     v2Type[v] = 3;
+                    tp_v[v] = 3;
                   }
                 } else{
                   // indirect call
