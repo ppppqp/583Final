@@ -61,7 +61,7 @@ namespace IntPatch{
       // std::map<Function*, AAResults*> f2Alias;
       std::map<Value*, int> v2Type;
       std::map<Value*, int> tp_v; // for pointer variable
-
+      std::vector<Value*> all_arithmetic_instr;
       for(Function &f : M){
         for(BasicBlock &bb: f){
           // initialize variables at key points
@@ -73,6 +73,7 @@ namespace IntPatch{
       
       bool change = true;
       int iterCount = 1;
+      
       while(change){
         errs() << "===============iteration: " << iterCount << "====================\n";
         iterCount++;
@@ -102,6 +103,9 @@ namespace IntPatch{
                 change |= (v2Type[&inst] != type);
                 // errs() << "at 82:" << change << "\n"; 
                 v2Type[&inst] = type;
+                // to record the dangerous instruction
+                all_arithmetic_instr.push_back(&inst);
+
               } else if(opcode == Instruction::Store){
               // " If variable v1 with type τ is stored into a memory pointed by v,
               // the target memory will be assigned with type τ, and the memory’s type information 
@@ -216,7 +220,7 @@ namespace IntPatch{
           }
         }
       }
-
+      errs() << "-------------- End of all iterations. --------------\n";
       for(auto i : v2Type){
         Instruction* inst = dyn_cast<Instruction>(i.first);
         if(inst){
@@ -225,9 +229,39 @@ namespace IntPatch{
           errs() << " BB:";
           inst->getParent()->printAsOperand(errs(), false);
 
+          // errs() << " inst:";
+          // inst->print(errs(), false);
+          errs() << " type:" << type << "\n";
+        }
+      }
+      errs() << "-------------- dangerous registers --------------\n";
+      for (auto i : v2Type) {
+        Instruction* inst = dyn_cast<Instruction>(i.first);
+        if(inst){
+          int type = i.second;
+          if (type != 3) {
+            continue;
+          }
+          errs() << "Function:" << inst->getParent()->getParent()->getName();
+          errs() << " BB:";
+          inst->getParent()->printAsOperand(errs(), false);
+
           errs() << " inst:";
           inst->print(errs(), false);
           errs() << " type:" << type << "\n";
+          errs() << "related arithmetic operations: \n";
+          for (auto one : all_arithmetic_instr) {
+            Instruction* arith = dyn_cast<Instruction>(one);
+            if (!arith) {
+              continue;
+            }
+            auto num = arith->getNumOperands();
+            for (int i = 0; i < num; ++i) {
+              if (inst == arith->getOperand(i)) {
+                arith->print(errs(), false);
+              }
+            }
+          }
         }
       }
       return false;
