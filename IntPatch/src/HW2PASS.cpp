@@ -62,6 +62,7 @@ namespace IntPatch{
       std::map<Value*, int> v2Type;
       std::map<Value*, int> tp_v; // for pointer variable
       std::vector<Value*> all_arithmetic_instr;
+      std::map<Value*, bool> vulnerables;
       for(Function &f : M){
         for(BasicBlock &bb: f){
           // initialize variables at key points
@@ -128,6 +129,7 @@ namespace IntPatch{
                   if(v2Type[value] == 3){
                     // vulnerability
                     errs() << inst << "\n\n#######!!!!!!!!Uses a 11 type operand at sink!!!!!!!!########\n\n";
+                    vulnerables[&inst] = true;
                   }
                 }
               } else if(opcode == Instruction::Load){
@@ -264,7 +266,58 @@ namespace IntPatch{
           }
         }
       }
-      return false;
+
+
+
+
+      // detection complete
+      // backward slicing, find all type 3 arithmetic ops that are associated with a vulnerable
+      
+
+
+
+
+      // inject check statement
+      LLVMContext& context = M->getContext();
+      FunctionType* funcType = FunctionType::get(Type::getVoidTy(context), false);
+      Function* newFunc = Function::Create(funcType, GlobalValue::LinkageTypes::ExternalLinkage, "vulnerableDetected", M);
+      BasicBlock* entryBB = BasicBlock::Create(context, "entry", newFunc);
+      IRBuilder<> checkFuncBuilder(entryBB);
+      checkFuncBuilder.CreateRetVoid();
+      
+
+      for(auto i: v2Type){
+        Instruction* inst = dyn_cast<Instruction>(i.first);
+        int type = i.second;
+        if(!inst || type != 3) continue;
+        if(inst->getOpcode() != Instruction::Add) continue;
+        // only fix addition for now
+        IRBuilder<> Builder(inst->getParent());
+        Builder.SetInsertPoint(inst);
+        Value* op0 = inst->getOperand(0);
+        Value* op1 = inst->getOperand(1);
+        Value* zero = llvm::ConstantInt::get(llvm::Type::getInt64Ty(context), 0)
+        ICmpInst* cmp1 = Builder.CreateICmpSGT(op0, zero); // signed > 0
+        ICmpInst* cmp2 = Builder.CreateICmpSGT(op1, zero);
+        ICmpInst* cmp3 = Builder.CreateICmpSLE(inst, zero); // signed <= 0
+        // the sum of two positive values leads to a negative value
+        // cmp1 xor cmp2 == 0, cmp3 = !cmp1
+
+        ICmpInst* cmp1Eqcmp2 = Builder.CreateICmpEQ(cmp1, cmp2);
+        ICmpInst* cmp1Neqcmp3 = Builder.CreateICmpNE(cmp1, cmp3);
+
+        // split the BB?
+        // branch to the original successor BB if any of the condition is false
+        // branch to the new BB (which calls the checkFunc) if all conditions are true
+
+        BranchInst* branch = Builder.CreateCondBr();
+
+        Builder.SetInsertPoint(preHeader->getTerminator());
+        StoreInst *Store = Builder.CreateStore(newLi, Alloca, true);
+
+
+      }
+      return true;
     }
   };
 }
