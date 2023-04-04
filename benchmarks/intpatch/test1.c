@@ -11,7 +11,8 @@ int main(){
     pFile = fopen("input1", "r");
     fscanf(pFile, "%d", &input);
     printf("%d", input);
-    int plus1=input+1;
+    int plus10=input+10;
+    printf("%d", plus10);
     fclose(pFile);
     // int* ptr = malloc(b+1+a);
     fn(b+3+a);

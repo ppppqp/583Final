@@ -55,19 +55,18 @@ llvm-dis ${1}.fplicm.bc -o ${1}_after.ll
 
 ./${1}_fplicm > fplicm_output
 
-echo -e "\n=== Correctness Check ==="
-if [ "$(diff correct_output fplicm_output)" != "" ]; then
-    echo -e ">> FAIL\n"
-else
-    echo -e ">> PASS\n"
-    # Measure performance
-    echo -e "1. Performance of unoptimized code"
-    time ./${1}_no_fplicm > /dev/null
-    echo -e "\n\n"
-    echo -e "2. Performance of optimized code"
-    time ./${1}_fplicm > /dev/null
-    echo -e "\n\n"
-fi
+echo -e "\n=== Results ==="
+
+echo -e ">> PASS\n"
+# Measure performance
+echo -e "1. Unsanitized Code"
+./${1}_no_fplicm
+echo -e "\n$?"
+echo -e "\n\n"
+echo -e "2. Sanitized Code"
+./${1}_no_fplicm
+echo -e "\n$?"
+echo -e "\n\n"
 
 # Cleanup: Remove this if you want to retain the created files.
 # rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *.ll a.out

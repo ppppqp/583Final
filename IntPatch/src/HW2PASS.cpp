@@ -332,15 +332,19 @@ namespace IntPatch{
         Builder.SetInsertPoint(oldTerminator);
 
 
-        BasicBlock* tempBB = BasicBlock::Create(func->getContext(), "tempBB");
+        BasicBlock* tempBB = BasicBlock::Create(func->getContext(), "tempBB", func);
         IRBuilder<> tempBuilder(tempBB);
-        Builder.CreateRet(zero);
 
-        BranchInst* branch = tempBuilder.CreateCondBr(allHold, originalBB, tempBB);
+        Value* tempRet = tempBuilder.getInt32(42);
+        Constant *str = tempBuilder.CreateGlobalStringPtr("Detected!\n");
+        // FunctionCallee putsFunc = M.getOrInsertFunction("puts", tempBuilder.getInt32Ty(), tempBuilder.getInt8PtrTy(), nullptr);
+        // tempBuilder.CreateCall(putsFunc, str);
+        tempBuilder.CreateRet(tempRet);
+
+        BranchInst* branch = Builder.CreateCondBr(allHold, tempBB, originalBB);
         oldTerminator->eraseFromParent();
 
 
-        errs() << "here!!!!\n";
         for(Instruction& i : *tempBB){
           errs() << "In tempBB: " << i << "\n";
         }
