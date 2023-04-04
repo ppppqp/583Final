@@ -49,7 +49,7 @@ clang ${1}.fplicm.bc -o ${1}_fplicm
 # Generate text IR before pass
 llvm-dis ${1}.ls.bc -o ${1}_before.ll
 # Generate text IR before pass
-llvm-dis ${1}.ls.bc -o ${1}_after.ll
+llvm-dis ${1}.fplicm.bc -o ${1}_after.ll
 
 # Produce output from binary to check correctness
 

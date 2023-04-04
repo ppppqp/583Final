@@ -39,6 +39,12 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include <map>
 
+
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Dominators.h"
+#include <cassert>
 using namespace llvm;
 
 /*
@@ -266,10 +272,6 @@ namespace IntPatch{
           }
         }
       }
-
-
-
-
       // detection complete
       // backward slicing, find all type 3 arithmetic ops that are associated with a vulnerable
       
@@ -278,13 +280,14 @@ namespace IntPatch{
 
 
       // inject check statement
-      LLVMContext& context = M->getContext();
+      LLVMContext& context = M.getContext();
       FunctionType* funcType = FunctionType::get(Type::getVoidTy(context), false);
-      Function* newFunc = Function::Create(funcType, GlobalValue::LinkageTypes::ExternalLinkage, "vulnerableDetected", M);
-      BasicBlock* entryBB = BasicBlock::Create(context, "entry", newFunc);
-      IRBuilder<> checkFuncBuilder(entryBB);
-      checkFuncBuilder.CreateRetVoid();
-      
+      // Function* newFunc = Function::Create(funcType, GlobalValue::LinkageTypes::ExternalLinkage, "vulnerableDetected", M);
+      // BasicBlock* handlerBB = BasicBlock::Create(context, "handlerBB", newFunc);
+      // IRBuilder<> checkFuncBuilder(handlerBB);
+
+
+      // checkFuncBuilder.CreateRetVoid();
 
       for(auto i: v2Type){
         Instruction* inst = dyn_cast<Instruction>(i.first);
@@ -292,28 +295,55 @@ namespace IntPatch{
         if(!inst || type != 3) continue;
         if(inst->getOpcode() != Instruction::Add) continue;
         // only fix addition for now
+
+        Function* func = inst->getParent()->getParent();
         IRBuilder<> Builder(inst->getParent());
-        Builder.SetInsertPoint(inst);
+        Builder.SetInsertPoint(inst->getNextNode());
         Value* op0 = inst->getOperand(0);
         Value* op1 = inst->getOperand(1);
-        Value* zero = llvm::ConstantInt::get(llvm::Type::getInt64Ty(context), 0)
-        ICmpInst* cmp1 = Builder.CreateICmpSGT(op0, zero); // signed > 0
-        ICmpInst* cmp2 = Builder.CreateICmpSGT(op1, zero);
-        ICmpInst* cmp3 = Builder.CreateICmpSLE(inst, zero); // signed <= 0
+        Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0);
+
+
+        Value* cmp1 = Builder.CreateICmpSGT(op0, zero); // signed > 0
+        Value* cmp2 = Builder.CreateICmpSGT(op1, zero);
+        Value* cmp3 = Builder.CreateICmpSGT(inst, zero); // 
+
+
         // the sum of two positive values leads to a negative value
         // cmp1 xor cmp2 == 0, cmp3 = !cmp1
 
-        ICmpInst* cmp1Eqcmp2 = Builder.CreateICmpEQ(cmp1, cmp2);
-        ICmpInst* cmp1Neqcmp3 = Builder.CreateICmpNE(cmp1, cmp3);
+        Value* cmp1Eqcmp2 = Builder.CreateICmpEQ(cmp1, cmp2);
+        Value* cmp1Neqcmp3 = Builder.CreateICmpNE(cmp1, cmp3);
+        Value* allHold = Builder.CreateAnd(cmp1Eqcmp2, cmp1Neqcmp3); 
+
 
         // split the BB?
         // branch to the original successor BB if any of the condition is false
         // branch to the new BB (which calls the checkFunc) if all conditions are true
 
-        BranchInst* branch = Builder.CreateCondBr();
 
-        Builder.SetInsertPoint(preHeader->getTerminator());
-        StoreInst *Store = Builder.CreateStore(newLi, Alloca, true);
+        BasicBlock* originalBB = inst->getParent()->splitBasicBlock(dyn_cast<Instruction>(allHold)->getNextNode());
+        errs() << "SPLIT AT:";
+        originalBB->printAsOperand(errs(), false);
+        errs() << "\n";
+
+
+        Instruction* oldTerminator = inst->getParent()->getTerminator();
+        Builder.SetInsertPoint(oldTerminator);
+
+
+        BasicBlock* tempBB = BasicBlock::Create(func->getContext(), "tempBB");
+        IRBuilder<> tempBuilder(tempBB);
+        Builder.CreateRet(zero);
+
+        BranchInst* branch = tempBuilder.CreateCondBr(allHold, originalBB, tempBB);
+        oldTerminator->eraseFromParent();
+
+
+        errs() << "here!!!!\n";
+        for(Instruction& i : *tempBB){
+          errs() << "In tempBB: " << i << "\n";
+        }
 
 
       }
