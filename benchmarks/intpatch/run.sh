@@ -64,7 +64,7 @@ echo -e "1. Unsanitized Code"
 echo -e "\n$?"
 echo -e "\n\n"
 echo -e "2. Sanitized Code"
-./${1}_no_fplicm
+./${1}_fplicm
 echo -e "\n$?"
 echo -e "\n\n"
 

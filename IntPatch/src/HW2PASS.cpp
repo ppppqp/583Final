@@ -341,7 +341,7 @@ namespace IntPatch{
         // tempBuilder.CreateCall(putsFunc, str);
         tempBuilder.CreateRet(tempRet);
 
-        BranchInst* branch = Builder.CreateCondBr(allHold, tempBB, originalBB);
+        BranchInst* branch = Builder.CreateCondBr(allHold, originalBB, tempBB);
         oldTerminator->eraseFromParent();
 
 
