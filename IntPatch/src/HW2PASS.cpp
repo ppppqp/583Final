@@ -355,7 +355,7 @@ namespace IntPatch {
             Instruction *oldTerminator = inst->getParent()->getTerminator();
             Builder.SetInsertPoint(oldTerminator);
 
-            BranchInst *branch = Builder.CreateCondBr(allHold, originalBB, tempBB);
+            BranchInst *branch = Builder.CreateCondBr(allHold, tempBB, originalBB);
             oldTerminator->eraseFromParent();
         }
     };
