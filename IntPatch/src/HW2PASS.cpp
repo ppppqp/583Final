@@ -292,24 +292,25 @@ namespace IntPatch {
 
             // checkFuncBuilder.CreateRetVoid();
 
-            // the error block
-            BasicBlock *tempBB = BasicBlock::Create(func->getContext(), "tempBB", func);
-            IRBuilder<> tempBuilder(tempBB);
-
-            Value *tempRet = tempBuilder.getInt32(42);
-            Constant *str = tempBuilder.CreateGlobalStringPtr("Detected!\n");
-            // FunctionCallee putsFunc = M.getOrInsertFunction("puts", tempBuilder.getInt32Ty(), tempBuilder.getInt8PtrTy(), nullptr);
-            // tempBuilder.CreateCall(putsFunc, str);
-            tempBuilder.CreateRet(tempRet);
 
             for (auto i : v2Type) {
                 Instruction *inst = dyn_cast<Instruction>(i.first);
                 int type = i.second;
                 if (!inst || type != 3) continue;
+                Function *func = inst->getParent()->getParent();
+                BasicBlock *tempBB = BasicBlock::Create(func->getContext(), "tempBB", func);
+                
+                IRBuilder<> tempBuilder(tempBB);
+
+                Value *tempRet = tempBuilder.getInt32(42);
+                Constant *str = tempBuilder.CreateGlobalStringPtr("Detected!\n");
+                // FunctionCallee putsFunc = M.getOrInsertFunction("puts", tempBuilder.getInt32Ty(), tempBuilder.getInt8PtrTy(), nullptr);
+                // tempBuilder.CreateCall(putsFunc, str);
+                tempBuilder.CreateRet(tempRet);
                 // switch statement
                 switch (inst->getOpcode()) {
                     case Instruction::Add: {
-                        add_patch(inst, tempBB);
+                        add_patch(inst, tempBB, context);
                         break;
                     }
                 }
@@ -319,7 +320,7 @@ namespace IntPatch {
 
             return true;
         }
-        void add_patch(Instruction* inst, BasicBlock* tempBB) {
+        void add_patch(Instruction* inst, BasicBlock* tempBB, LLVMContext &context) {
             Function *func = inst->getParent()->getParent();
             IRBuilder<> Builder(inst->getParent());
             Builder.SetInsertPoint(inst->getNextNode());
