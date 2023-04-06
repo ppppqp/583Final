@@ -356,7 +356,89 @@ namespace IntPatch {
             }
             return true;
         }
-    };
+      }
+      // detection complete
+      // backward slicing, find all type 3 arithmetic ops that are associated with a vulnerable
+      
+
+
+
+
+      // inject check statement
+      LLVMContext& context = M.getContext();
+      FunctionType* funcType = FunctionType::get(Type::getVoidTy(context), false);
+      // Function* newFunc = Function::Create(funcType, GlobalValue::LinkageTypes::ExternalLinkage, "vulnerableDetected", M);
+      // BasicBlock* handlerBB = BasicBlock::Create(context, "handlerBB", newFunc);
+      // IRBuilder<> checkFuncBuilder(handlerBB);
+
+
+      // checkFuncBuilder.CreateRetVoid();
+
+      for(auto i: v2Type){
+        Instruction* inst = dyn_cast<Instruction>(i.first);
+        int type = i.second;
+        if(!inst || type != 3) continue;
+        if(inst->getOpcode() != Instruction::Add) continue;
+        // only fix addition for now
+
+        Function* func = inst->getParent()->getParent();
+        IRBuilder<> Builder(inst->getParent());
+        Builder.SetInsertPoint(inst->getNextNode());
+        Value* op0 = inst->getOperand(0);
+        Value* op1 = inst->getOperand(1);
+        Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0);
+
+
+        Value* cmp1 = Builder.CreateICmpSGT(op0, zero); // signed > 0
+        Value* cmp2 = Builder.CreateICmpSGT(op1, zero);
+        Value* cmp3 = Builder.CreateICmpSGT(inst, zero); // 
+
+
+        // the sum of two positive values leads to a negative value
+        // cmp1 xor cmp2 == 0, cmp3 = !cmp1
+
+        Value* cmp1Eqcmp2 = Builder.CreateICmpEQ(cmp1, cmp2);
+        Value* cmp1Neqcmp3 = Builder.CreateICmpNE(cmp1, cmp3);
+        Value* allHold = Builder.CreateAnd(cmp1Eqcmp2, cmp1Neqcmp3); 
+
+
+        // split the BB?
+        // branch to the original successor BB if any of the condition is false
+        // branch to the new BB (which calls the checkFunc) if all conditions are true
+
+
+        BasicBlock* originalBB = inst->getParent()->splitBasicBlock(dyn_cast<Instruction>(allHold)->getNextNode());
+        errs() << "SPLIT AT:";
+        originalBB->printAsOperand(errs(), false);
+        errs() << "\n";
+
+
+        Instruction* oldTerminator = inst->getParent()->getTerminator();
+        Builder.SetInsertPoint(oldTerminator);
+
+
+        BasicBlock* tempBB = BasicBlock::Create(func->getContext(), "tempBB", func);
+        IRBuilder<> tempBuilder(tempBB);
+
+        Value* tempRet = tempBuilder.getInt32(42);
+        Constant *str = tempBuilder.CreateGlobalStringPtr("Detected!\n");
+        // FunctionCallee putsFunc = M.getOrInsertFunction("puts", tempBuilder.getInt32Ty(), tempBuilder.getInt8PtrTy(), nullptr);
+        // tempBuilder.CreateCall(putsFunc, str);
+        tempBuilder.CreateRet(tempRet);
+
+        BranchInst* branch = Builder.CreateCondBr(allHold, tempBB, originalBB);
+        oldTerminator->eraseFromParent();
+
+
+        for(Instruction& i : *tempBB){
+          errs() << "In tempBB: " << i << "\n";
+        }
+
+
+      }
+      return true;
+    }
+  };
 }
 
 char IntPatch::DetectPass::ID = 0;

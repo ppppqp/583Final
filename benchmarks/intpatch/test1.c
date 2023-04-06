@@ -15,7 +15,7 @@ int main(){
     printf("%d", plus10);
     fclose(pFile);
     // int* ptr = malloc(b+1+a);
-    fn(b+3+a);
-    printf("%d", b+3+a); // 1
+    // fn(b+3+a);
+    // printf("%d", b+3+a); // 1
     return 0;
 }

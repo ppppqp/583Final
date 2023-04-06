@@ -13,7 +13,7 @@ rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *.ll
 
 # Convert source code to bitcode (IR).
 # clang -fsanitize=unsigned-integer-overflow ${1}.c
-clang -emit-llvm -c ${1}.c -o ${1}.bc
+clang -emit-llvm -fno-strict-overflow  -c ${1}.c -o ${1}.bc
 
 # # Canonicalize natural loops (Ref: llvm.org/doxygen/LoopSimplify_8h_source.html)
 opt -passes='loop-simplify' ${1}.bc -o ${1}.ls.bc
@@ -24,7 +24,7 @@ opt -passes='pgo-instr-gen,instrprof' ${1}.ls.bc -o ${1}.ls.prof.bc
 # Note: We are using the New Pass Manager for these passes! 
 
 # Generate binary executable with profiler embedded
-clang -fprofile-instr-generate ${1}.ls.prof.bc -o ${1}_prof
+clang -fprofile-instr-generate -fno-strict-overflow ${1}.ls.prof.bc -o ${1}_prof
 
 # When we run the profiler embedded executable, it generates a default.profraw file that contains the profile data.
 ./${1}_prof > correct_output
@@ -40,11 +40,11 @@ opt -passes="pgo-instr-use" -o ${1}.profdata.bc -pgo-test-profile-file=${1}.prof
 opt -enable-new-pm=0 -o ${1}.fplicm.bc -load ${PATH2LIB} ${PASS} < ${1}.profdata.bc > /dev/null
 
 
-clang -emit-llvm -S ${1}.c -o fun.ll
+clang -emit-llvm -fno-strict-overflow -S ${1}.c -o fun.ll
 # Generate binary excutable before FPLICM: Unoptimzied code
-clang ${1}.ls.bc -o ${1}_no_fplicm 
+clang ${1}.ls.bc -fno-strict-overflow -o ${1}_no_fplicm 
 # Generate binary executable after FPLICM: Optimized code
-clang ${1}.fplicm.bc -o ${1}_fplicm
+clang ${1}.fplicm.bc -fno-strict-overflow -o ${1}_fplicm
 
 # Generate text IR before pass
 llvm-dis ${1}.ls.bc -o ${1}_before.ll
