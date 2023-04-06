@@ -2,7 +2,7 @@
 # Run script for Homework 2 EECS 583 Winter 2023
 
 # ACTION NEEDED: If the path is different, please update it here.
-PATH2LIB=/n/eecs583a/home/panqp/583/project/IntPatch/build/src/LLVMHW2.so        # Specify your build directory in the project
+PATH2LIB=~/583Final/IntPatch/build/src/LLVMHW2.so        # Specify your build directory in the project
 
 # ACTION NEEDED: Choose the correct pass when running.
 PASS=-intpatch-detect                  # Choose either -fplicm-correctness ...
