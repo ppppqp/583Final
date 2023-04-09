@@ -313,6 +313,10 @@ namespace IntPatch {
                         add_patch(inst, tempBB, context);
                         break;
                     }
+                    case Instruction::Sub: {
+                        sub_patch(inst, tempBB, context);
+                        break;
+                    }
                 }
             }
 
@@ -346,6 +350,43 @@ namespace IntPatch {
             // branch to the original successor BB if any of the condition is false
             // branch to the new BB (which calls the checkFunc) if all conditions are true
 
+
+            BasicBlock *originalBB = inst->getParent()->splitBasicBlock(dyn_cast<Instruction>(allHold)->getNextNode());
+            errs() << "SPLIT AT:";
+            originalBB->printAsOperand(errs(), false);
+            errs() << "\n";
+
+
+            Instruction *oldTerminator = inst->getParent()->getTerminator();
+            Builder.SetInsertPoint(oldTerminator);
+
+            BranchInst *branch = Builder.CreateCondBr(allHold, tempBB, originalBB);
+            oldTerminator->eraseFromParent();
+        }
+
+        void sub_patch(Instruction* inst, BasicBlock* tempBB, LLVMContext &context) {
+            Function *func = inst->getParent()->getParent();
+            IRBuilder<> Builder(inst->getParent());
+            Builder.SetInsertPoint(inst->getNextNode());
+            Value *op0 = inst->getOperand(0);
+            Value *op1 = inst->getOperand(1);
+            Value *zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0);
+
+            // check the sign of the two inputs
+            Value *cmp1 = Builder.CreateICmpSGT(op0, zero);     // signed > 0
+            Value *cmp2 = Builder.CreateICmpSGT(op1, zero);     // signed < 0
+
+            // check the result against the first input
+            Value *cmp3 = Builder.CreateICmpSLE(inst, op0);    // result < cmp1 ? 
+            Value *cmp4 = Builder.CreateICmpSGT(inst, op0);   // result > cmp1 ? 
+
+            // if overflowed,   (pos - neg) will be smaller than pos
+            //                  (neg - pos) will be larger than neg
+            // Conditions:  (1) cmp1 and cmp2 has different sign
+            //              (2) cmp3 < cmp1 or cmp3 > cmp1
+            Value *first_case = Builder.CreateICmpNE(cmp1, cmp2);
+            Value *second_case = Builder.CreateOr(cmp3, cmp4);
+            Value *allHold = Builder.CreateAnd(first_case, second_case);
 
             BasicBlock *originalBB = inst->getParent()->splitBasicBlock(dyn_cast<Instruction>(allHold)->getNextNode());
             errs() << "SPLIT AT:";
