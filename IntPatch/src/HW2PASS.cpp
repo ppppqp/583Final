@@ -71,7 +71,7 @@ namespace IntPatch {
             // std::map<Function*, AAResults*> f2Alias;
             std::map < Value * , int > v2Type;
             std::map < Value * , int > tp_v; // for pointer variable
-            std::vector < Value * > all_arithmetic_instr;
+            std::set < Value * > all_arithmetic_instr;
             std::map < Value * , bool > vulnerables;
             for (Function &f: M) {
                 for (BasicBlock &bb: f) {
@@ -86,12 +86,12 @@ namespace IntPatch {
             int iterCount = 1;
 
             while (change) {
-                errs() << "===============iteration: " << iterCount << "====================\n";
+                errs() << "\n\n\033[32m===============iteration: " << iterCount << "====================\033[0m\n";
                 iterCount++;
                 change = false;
                 for (Function &f: M) {
                     if (f.isDeclaration()) {
-                        errs() << f.getName() << " only has declaration. Skip!\n";
+                        errs() << "\033[36m[INFO]\033[0m" << f.getName() << " only has declaration. Skip!\n";
                         continue;
                     }
 
@@ -115,7 +115,7 @@ namespace IntPatch {
                                 // errs() << "at 82:" << change << "\n";
                                 v2Type[&inst] = type;
                                 // to record the dangerous instruction
-                                all_arithmetic_instr.push_back(&inst);
+                                all_arithmetic_instr.insert(&inst);
 
                             } else if (opcode == Instruction::Store) {
                                 // " If variable v1 with type τ is stored into a memory pointed by v,
@@ -129,16 +129,12 @@ namespace IntPatch {
                                 Value *value = store->getValueOperand();
                                 if (v2Type.find(value) != v2Type.end()) {
                                     int valueType = v2Type[value];
-
-                                    // change |= (v2Type[storePtr] != valueType);
-                                    // errs() << "at 97:" << change << "\n";
-                                    // v2Type[storePtr] = valueTyvpe;
-
                                     tp_v[storePtr] |= valueType; // initial value of tp_v?
                                     v2Type[&inst] = valueType;
                                     if (v2Type[value] == 3) {
                                         // vulnerability
-                                        errs() << inst << "\n\n#######!!!!!!!!Uses a 11 type operand at sink!!!!!!!!########\n\n";
+                                        errs() << "\033[1m\033[31m[WARN]Uses a type 3 operand at sink!\n";
+                                        errs() << "      Instruction:" << inst << "\033[0m\n";
                                         vulnerables[&inst] = true;
                                     }
                                 }
@@ -151,14 +147,12 @@ namespace IntPatch {
                                 //TODO: for all v in the alias,  type |= tp_v[loadAddr]
                                 aliasSetTracker.add(load);
                                 AliasSet &aliasSet = aliasSetTracker.getAliasSetFor(loadAddr);
-                                // errs() << "LOAD OP:" << *load << "\n";
-                                // errs() << "ALIAS:\n";
+                                errs() << "\033[36m[INFO]\033[35m[ALIAS ANALYSIS]\033[0m " << *load << " has alias:\n";
                                 for (AliasSet::iterator I = aliasSet.begin(), E = aliasSet.end(); I != E; ++I) {
                                     Value *V = I.getPointer();
-                                    // errs() << " * ";
+                                    errs() << " * ";
                                     V->print(errs(), false);
-                                    // errs() << ":";
-                                    // errs() << "\n";
+                                    errs() << "\n";
                                     if (tp_v.find(V) != tp_v.end()) {
                                         type |= tp_v[V];
                                     }
@@ -231,21 +225,24 @@ namespace IntPatch {
                     }
                 }
             }
-            errs() << "-------------- End of all iterations. --------------\n";
+            errs() << "\n\n\033[32m===============End of all iterations====================\033[0m\n";
+
             for (auto i: v2Type) {
                 Instruction *inst = dyn_cast<Instruction>(i.first);
                 if (inst) {
                     int type = i.second;
+                    errs() << "\033[36m[INFO]\033[0m";
                     errs() << "Function:" << inst->getParent()->getParent()->getName();
                     errs() << " BB:";
                     inst->getParent()->printAsOperand(errs(), false);
-
-                    // errs() << " inst:";
-                    // inst->print(errs(), false);
-                    errs() << " type:" << type << "\n";
+                    if(type == 3) errs() << "\033[31m";
+                    errs() << " inst:";
+                    inst->print(errs(), false);
+                    errs() << " Type:" << type << "\n";
+                    errs() << "\033[0m";
                 }
             }
-            errs() << "-------------- dangerous registers --------------\n";
+            errs() << "\n\n\033[32m===============Dangerous Registers====================\033[0m\n";
             for (auto i: v2Type) {
                 Instruction *inst = dyn_cast<Instruction>(i.first);
                 if (inst) {
@@ -253,15 +250,19 @@ namespace IntPatch {
                     if (type != 3) {
                         continue;
                     }
-                    errs() << "Function:" << inst->getParent()->getParent()->getName();
+                    errs() << "\033[36m[INFO]\033[0m";
+                    errs() << "Fn:" << inst->getParent()->getParent()->getName();
                     errs() << " BB:";
                     inst->getParent()->printAsOperand(errs(), false);
 
-                    errs() << " inst:";
+                    errs() << " Inst:";
                     inst->print(errs(), false);
-                    errs() << " type:" << type << "\n";
-                    errs() << "related arithmetic operations: \n";
+
+                    errs() << " Type:" << type << "\n";
+
+                    bool hasRelated = false;
                     for (auto one: all_arithmetic_instr) {
+                    
                         Instruction *arith = dyn_cast<Instruction>(one);
                         if (!arith) {
                             continue;
@@ -269,7 +270,13 @@ namespace IntPatch {
                         auto num = arith->getNumOperands();
                         for (int i = 0; i < num; ++i) {
                             if (inst == arith->getOperand(i)) {
+                                if(hasRelated == false){
+                                    hasRelated = true;
+                                    errs() << "related arithmetic operations: \n";
+                                }
                                 arith->print(errs(), false);
+                                errs() << "\n";
+                                break;
                             }
                         }
                     }
