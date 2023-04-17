@@ -12,11 +12,27 @@ The tool in this repository detects integer-related vulnerabilities in LLVM IR c
 The tool is implemented as a module pass in LLVM. It takes LLVM IR code as input, analyzes the code, and outputs a report of any detected vulnerabilities.
 
 ## Usage
-To use the tool, you must have LLVM installed on your system. Once you have LLVM installed, follow these steps:
+To use the tool, follow these steps:
 
-Build the tool by running make in the root directory of the repository.
-Run the tool on your LLVM IR code using the following command:
-TODO
+1. Make sure that LLVM is installed on your system. If you don't have LLVM installed, you can refer to the "Getting Started with the LLVM System" page in the LLVM documentation for full installation details. The documentation can be found at https://llvm.org/docs/GettingStarted.html
+After installing LLVM, verify that the following versions are correct:
+
+clang --version
+llvm-config --version
+opt --version
+
+2. Go to the build directory of the project and run cmake, then make:
+cd InPatch/build
+cmake ..
+make
+
+3. To run the tool on a specific test file, navigate to the benchmarks/intpatch directory and run the following command:
+sh run.sh test2
+This will run the tool on test2.c.
+
+
+Alternatively, to run the tool on all test files provided and count the lines before and after, run the following command:
+sh test_runner.sh
 
 ## Limitations
 The tool has several limitations:
